@@ -2,17 +2,19 @@ import torch.nn as nn
 import torch
 from torch.autograd import Variable
 from ModelParallel import ModelParallel
+import torchvision.models as models
+import time
 
 
-class Net(nn.Module):
+class SmallNet(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.linear = nn.Sequential(nn.Linear(3, 100),
+        self.linear = nn.Sequential(nn.Linear(30, 1000),
                                     nn.Sigmoid(),
-                                    nn.Linear(100, 300),
+                                    nn.Linear(1000, 3000),
                                     nn.Sigmoid(),
-                                    nn.Linear(300, 2)
+                                    nn.Linear(3000, 2)
                                     )
 
     def forward(self, input):
@@ -20,28 +22,47 @@ class Net(nn.Module):
 
 
 class Ensemble(nn.Module):
-    def __init__(self, m):
+    def __init__(self, m, mode='small'):
         super(Ensemble, self).__init__()
-
-        self.module = nn.ModuleList([Net() for i in range(m)])
+        if mode == 'small':
+            self.module = nn.ModuleList([Net() for i in range(m)])
+        elif mode == 'large':
+            self.module = nn.ModuleList([models.resnet50() for i in range(m)])
 
     def forward(self, input):
         return [module(input) for module in self.module]
 
 
-ensemble = Ensemble(5)
+def test_model_parallel(mode='small'):
+    ensemble = Ensemble(4)
 
-model = ModelParallel(ensemble, device_ids=[0, 1, 2, 4, 5], output_device=0)
-print len(model.module.module)
-input = Variable(torch.rand(10, 3))
+    model = ModelParallel(ensemble, device_ids=[0, 1, 2, 3], output_device=0)
+    if mode == 'small':
+        input = Variable(torch.rand(512, 30))
+    elif mode == 'large':
+        input = Variable(torch.rand(128, 3, 224, 224))
 
-import time
-end = time.time()
-y = model(input)
-print('using model parallel')
-print('time : ', time.time() - end)
+    end = time.time()
+    y = model(input)
+    print('using model parallel')
+    print('time : ', time.time() - end)
 
-end = time.time()
-y = ensemble(input)
-print('without model parallel')
-print('time: ', time.time() - end)
+
+def test_without_parallel(mode='small'):
+    ensemble = Ensemble(4)
+    [ensemble.moudle[i].cuda(i) for i in range(4)]
+
+    end = time.time()
+    y = [ensemble.module[i](input.cuda(i)) for i in range(4)]
+    print('without model parallel')
+    print('time: ', time.time() - end)
+
+
+if __name__ == '__main__':
+    # on small net
+    test_model_parallel('small')
+    test_without_parallel('small')
+
+    # on imagenet resnet50
+    test_model_parallel('large')
+    test_without_parallel('large')

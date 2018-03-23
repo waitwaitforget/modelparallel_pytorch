@@ -3,7 +3,7 @@ import torch.nn as nn
 import threading
 
 
-def replicate(module, device):
+def distribute_module(module, device):
     return module.cuda(device)
 
 
@@ -20,13 +20,13 @@ def parallel_apply(modules, inputs, kwargs_tup=None, devices=None):
 
     lock = threading.Lock()
     results = {}
-    grad_enabled = torch.is_grad_enabled()
+    #grad_enabled = torch.is_grad_enabled()
 
     def _worker(i, module, input, kwargs, device=None):
-        torch.set_grad_enabled(grad_enabled)
+        # torch.set_grad_enabled(grad_enabled)
         try:
             with torch.cuda.device(device):
-                output = module(*input, **kwargs)
+                output = module(input)
             with lock:
                 results[i] = output
         except Exception as e:
@@ -50,7 +50,7 @@ def parallel_apply(modules, inputs, kwargs_tup=None, devices=None):
         output = results[i]
         if isinstance(output, Exception):
             raise output
-        output.append(output)
+        outputs.append(output)
     return outputs
 
 
@@ -75,22 +75,24 @@ class ModelParallel(nn.Module):
 
         if output_device is None:
             output_device = device_ids[0]
+        self.output_device = output_device
         self.device_ids = device_ids
         self.module = model.module  # module is a list
-        self.replicate(self.module, device_ids)
+        self.distribute(self.module, device_ids)
 
     def forward(self, *inputs, **kwargs):
         if not self.device_ids:
             return self.module(*inputs, **kwargs)
         inputs, kwargs = self.scatter(inputs, kwargs, self.device_ids)
+
         if len(self.device_ids) == 1:
             return self.module(*inputs[0], **kwargs[0])
 
         outputs = self.parallel_apply(self.module, inputs, kwargs)
         return self.gather(outputs, self.output_device)
 
-    def replicate(self, module, device_ids):
-        return [replicate(m, id) for m, id in zip(module, device_ids)]
+    def distribute(self, module, device_ids):
+        return [distribute_module(m, id) for m, id in zip(module, device_ids)]
 
     def scatter(self, inputs, kwargs, device_ids):
         if len(inputs) == 1:
@@ -107,18 +109,3 @@ class ModelParallel(nn.Module):
     def gather(self, outputs, output_device):
         outputs = [output.cuda(output_device) for output in outputs]
         return outputs
-
-
-def unittest():
-    from torch.autograd import Variable
-    x = torch.rand(4, 3)
-    x = Variable(x)
-
-    def test(*inputs):
-        inputs, kwargs = scatter_kwargs(inputs, None, [0])
-        print(inputs)
-    test(x)
-
-
-if __name__ == '__main__':
-    unittest()
