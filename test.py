@@ -34,7 +34,7 @@ class Ensemble(nn.Module):
 
 
 def test_model_parallel(mode='small'):
-    ensemble = Ensemble(4)
+    ensemble = Ensemble(4, mode)
 
     model = ModelParallel(ensemble, device_ids=[0, 1, 2, 3], output_device=0)
     if mode == 'small':
@@ -49,7 +49,7 @@ def test_model_parallel(mode='small'):
 
 
 def test_without_parallel(mode='small'):
-    ensemble = Ensemble(4)
+    ensemble = Ensemble(4, mode)
     [ensemble.module[i].cuda(i) for i in range(4)]
 
     if mode == 'small':
