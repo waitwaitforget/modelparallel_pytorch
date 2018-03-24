@@ -2,7 +2,7 @@
 Model Parallelism for pytorch training multiple networks on multiple GPUs.
 
 ## ToDo List
-- [] Handle different kwargs for different networks
+- [ ] Handle different kwargs for different networks
 
 # Usage
 Model parallel is a wrapper for training multiple networks on multi-GPU simultaneously. Such as training ensemble models or multiple choice learning networks.
