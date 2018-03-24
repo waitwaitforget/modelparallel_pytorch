@@ -1,8 +1,11 @@
 # Model Parallelism
-Model Parallelism for pytorch training multiple network on multiple GPUs.
+Model Parallelism for pytorch training multiple networks on multiple GPUs.
+
+## ToDo List
+- [] Handle different kwargs for different networks
 
 # Usage
-Model parallel is a wrapper for multiple networks.
+Model parallel is a wrapper for training multiple networks on multi-GPU simultaneously. Such as training ensemble models or multiple choice learning networks.
 
 Unlike data parallel, the outputs of model parallel is a list for general purpose.
 
@@ -32,4 +35,4 @@ y = model(Variable(x))
 ```
 
 ## Useful links
-Some multithreading code borrow from [pytorch data parallel](https://github.com/pytorch/pytorch/blob/v0.3.1/torch/nn/parallel/parallel_apply.py)
+Some multithreading code is borrowed from [pytorch data parallel](https://github.com/pytorch/pytorch/blob/v0.3.1/torch/nn/parallel/parallel_apply.py)
